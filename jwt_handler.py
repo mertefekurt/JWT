@@ -3,6 +3,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from config import settings
 from models import TokenData
+from token_blacklist import is_token_blacklisted
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -30,6 +31,8 @@ def create_refresh_token(data: dict) -> str:
     return encoded_jwt
 
 def verify_token(token: str) -> TokenData:
+    if is_token_blacklisted(token):
+        raise JWTError("Token has been revoked")
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         username: str = payload.get("sub")

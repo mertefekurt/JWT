@@ -5,6 +5,7 @@ from jose import JWTError, jwt
 from config import settings
 from models import UserCreate, UserLogin, UserResponse, Token, TokenRefresh
 from jwt_handler import verify_password, get_password_hash, create_access_token, create_refresh_token, verify_token
+from token_blacklist import add_to_blacklist
 
 app = FastAPI(title="JWT Learning Project")
 
@@ -95,6 +96,11 @@ async def refresh_token(token_data: TokenRefresh):
         return {"access_token": new_access_token, "refresh_token": new_refresh_token, "token_type": "bearer"}
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+@app.post("/logout")
+async def logout(token: str = Depends(oauth2_scheme)):
+    add_to_blacklist(token)
+    return {"message": "Successfully logged out"}
 
 @app.get("/users/me", response_model=UserResponse)
 async def read_users_me(current_user: dict = Depends(get_current_user)):

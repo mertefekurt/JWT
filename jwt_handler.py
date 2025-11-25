@@ -35,6 +35,9 @@ def verify_token(token: str) -> TokenData:
         raise JWTError("Token has been revoked")
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        token_type = payload.get("type")
+        if token_type and token_type != "access":
+            raise JWTError("Invalid token type for this endpoint")
         username: str = payload.get("sub")
         if username is None:
             raise JWTError("Token invalid")

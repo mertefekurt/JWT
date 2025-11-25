@@ -60,13 +60,17 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 async def register(user: UserCreate):
     if user.username in fake_users_db:
         raise HTTPException(status_code=400, detail="Username already registered")
+    for existing_user in fake_users_db.values():
+        if existing_user["email"] == user.email:
+            raise HTTPException(status_code=400, detail="Email already registered")
     hashed_password = get_password_hash(user.password)
+    from datetime import datetime
     new_user = {
         "id": len(fake_users_db) + 1,
         "username": user.username,
         "email": user.email,
         "hashed_password": hashed_password,
-        "created_at": "2024-01-01T00:00:00"
+        "created_at": datetime.now().isoformat()
     }
     fake_users_db[user.username] = new_user
     return UserResponse(**new_user)

@@ -1,13 +1,19 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.exceptions import RequestValidationError
 from datetime import timedelta
 from jose import JWTError, jwt
 from config import settings
 from models import UserCreate, UserLogin, UserResponse, Token, TokenRefresh
 from jwt_handler import verify_password, get_password_hash, create_access_token, create_refresh_token, verify_token
 from token_blacklist import add_to_blacklist
+from exceptions import token_exception_handler, jwt_exception_handler, validation_exception_handler, TokenException
 
 app = FastAPI(title="JWT Learning Project")
+
+app.add_exception_handler(TokenException, token_exception_handler)
+app.add_exception_handler(JWTError, jwt_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 

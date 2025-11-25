@@ -1,10 +1,10 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from datetime import timedelta
-from jose import JWTError
+from jose import JWTError, jwt
 from config import settings
-from models import UserCreate, UserLogin, UserResponse, Token
-from jwt_handler import verify_password, get_password_hash, create_access_token, verify_token
+from models import UserCreate, UserLogin, UserResponse, Token, TokenRefresh
+from jwt_handler import verify_password, get_password_hash, create_access_token, create_refresh_token, verify_token
 
 app = FastAPI(title="JWT Learning Project")
 
@@ -77,7 +77,24 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     access_token = create_access_token(
         data={"sub": user["username"]}, expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    refresh_token = create_refresh_token(data={"sub": user["username"]})
+    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
+
+@app.post("/refresh", response_model=Token)
+async def refresh_token(token_data: TokenRefresh):
+    try:
+        token_info = verify_token(token_data.refresh_token)
+        payload = jwt.decode(token_data.refresh_token, settings.secret_key, algorithms=[settings.algorithm])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+        new_access_token = create_access_token(
+            data={"sub": token_info.username}, expires_delta=access_token_expires
+        )
+        new_refresh_token = create_refresh_token(data={"sub": token_info.username})
+        return {"access_token": new_access_token, "refresh_token": new_refresh_token, "token_type": "bearer"}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
 @app.get("/users/me", response_model=UserResponse)
 async def read_users_me(current_user: dict = Depends(get_current_user)):

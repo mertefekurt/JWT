@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from datetime import timedelta
 from jose import JWTError, jwt
 from config import settings
@@ -10,6 +12,19 @@ from token_blacklist import add_to_blacklist
 from exceptions import token_exception_handler, jwt_exception_handler, validation_exception_handler, TokenException
 
 app = FastAPI(title="JWT Learning Project")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["*"]
+)
 
 app.add_exception_handler(TokenException, token_exception_handler)
 app.add_exception_handler(JWTError, jwt_exception_handler)
@@ -115,6 +130,15 @@ async def logout(token: str = Depends(oauth2_scheme)):
 @app.get("/users/me", response_model=UserResponse)
 async def read_users_me(current_user: dict = Depends(get_current_user)):
     return UserResponse(**current_user)
+
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    import time
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    return response
 
 @app.get("/")
 async def root():

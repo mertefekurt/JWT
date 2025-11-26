@@ -6,7 +6,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from datetime import timedelta, datetime
 from jose import JWTError, jwt
 from config import settings
-from models import UserCreate, UserLogin, UserResponse, Token, TokenRefresh, UserUpdate
+from models import UserCreate, UserLogin, UserResponse, Token, TokenRefresh, UserUpdate, PasswordChange
 from jwt_handler import verify_password, get_password_hash, create_access_token, create_refresh_token, verify_token
 from token_blacklist import add_to_blacklist
 from exceptions import token_exception_handler, jwt_exception_handler, validation_exception_handler, TokenException
@@ -159,6 +159,23 @@ async def update_user_profile(
     
     log_auth_event("PROFILE_UPDATE", current_user["username"], True)
     return UserResponse(**updated_user)
+
+@app.post("/users/me/change-password")
+async def change_password(
+    password_data: PasswordChange,
+    current_user: dict = Depends(get_current_user)
+):
+    if not verify_password(password_data.current_password, current_user["hashed_password"]):
+        log_security_event("Password change attempt", f"Invalid current password for user: {current_user['username']}")
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    if password_data.current_password == password_data.new_password:
+        raise HTTPException(status_code=400, detail="New password must be different from current password")
+    
+    new_hashed_password = get_password_hash(password_data.new_password)
+    user_repository.update(current_user["username"], {"hashed_password": new_hashed_password})
+    log_auth_event("PASSWORD_CHANGE", current_user["username"], True)
+    return {"message": "Password changed successfully"}
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):

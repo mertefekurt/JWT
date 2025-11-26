@@ -33,6 +33,14 @@ class UserRepository:
         self._users[username].update(update_data)
         return self._users[username]
     
+    def update_username(self, old_username: str, new_username: str) -> bool:
+        if old_username not in self._users or new_username in self._users:
+            return False
+        user_data = self._users.pop(old_username)
+        user_data["username"] = new_username
+        self._users[new_username] = user_data
+        return True
+    
     def get_all(self) -> List[dict]:
         return list(self._users.values())
     

@@ -6,7 +6,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from datetime import timedelta, datetime
 from jose import JWTError, jwt
 from config import settings
-from models import UserCreate, UserLogin, UserResponse, Token, TokenRefresh
+from models import UserCreate, UserLogin, UserResponse, Token, TokenRefresh, UserUpdate
 from jwt_handler import verify_password, get_password_hash, create_access_token, create_refresh_token, verify_token
 from token_blacklist import add_to_blacklist
 from exceptions import token_exception_handler, jwt_exception_handler, validation_exception_handler, TokenException
@@ -128,6 +128,37 @@ async def logout(token: str = Depends(oauth2_scheme)):
 @app.get("/users/me", response_model=UserResponse)
 async def read_users_me(current_user: dict = Depends(get_current_user)):
     return UserResponse(**current_user)
+
+@app.put("/users/me", response_model=UserResponse)
+async def update_user_profile(
+    user_update: UserUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    update_data = {}
+    if user_update.email is not None:
+        existing_user = user_repository.get_by_email(user_update.email)
+        if existing_user and existing_user["username"] != current_user["username"]:
+            raise HTTPException(status_code=400, detail="Email already in use")
+        update_data["email"] = user_update.email
+    
+    if user_update.username is not None and user_update.username != current_user["username"]:
+        if user_repository.exists(user_update.username):
+            raise HTTPException(status_code=400, detail="Username already taken")
+        old_username = current_user["username"]
+        if user_update.email:
+            update_data["email"] = user_update.email
+        if update_data:
+            user_repository.update(old_username, update_data)
+        user_repository.update_username(old_username, user_update.username)
+        updated_user = user_repository.get_by_username(user_update.username)
+    else:
+        updated_user = user_repository.update(current_user["username"], update_data)
+    
+    if not updated_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    log_auth_event("PROFILE_UPDATE", current_user["username"], True)
+    return UserResponse(**updated_user)
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):

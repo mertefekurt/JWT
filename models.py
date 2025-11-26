@@ -54,3 +54,17 @@ class TokenRefresh(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    username: Optional[str] = None
+    
+    @field_validator('username')
+    @classmethod
+    def validate_username(cls, v):
+        if v is not None:
+            if len(v) < 3:
+                raise ValueError('Username must be at least 3 characters')
+            if not v.isalnum():
+                raise ValueError('Username must contain only alphanumeric characters')
+        return v
+

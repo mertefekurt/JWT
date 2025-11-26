@@ -11,6 +11,7 @@ from jwt_handler import verify_password, get_password_hash, create_access_token,
 from token_blacklist import add_to_blacklist
 from exceptions import token_exception_handler, jwt_exception_handler, validation_exception_handler, TokenException
 from repository import user_repository
+from logger import log_request, log_error, log_auth_event, log_security_event
 
 app = FastAPI(title="JWT Learning Project")
 
@@ -65,8 +66,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 @app.post("/register", response_model=UserResponse)
 async def register(user: UserCreate):
     if user_repository.exists(user.username):
+        log_security_event("Registration attempt", f"Username already exists: {user.username}")
         raise HTTPException(status_code=400, detail="Username already registered")
     if user_repository.get_by_email(user.email):
+        log_security_event("Registration attempt", f"Email already exists: {user.email}")
         raise HTTPException(status_code=400, detail="Email already registered")
     hashed_password = get_password_hash(user.password)
     new_user = user_repository.create({
@@ -74,12 +77,14 @@ async def register(user: UserCreate):
         "email": user.email,
         "hashed_password": hashed_password
     })
+    log_auth_event("REGISTER", user.username, True)
     return UserResponse(**new_user)
 
 @app.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
+        log_auth_event("LOGIN", form_data.username, False)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -90,6 +95,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         data={"sub": user["username"]}, expires_delta=access_token_expires
     )
     refresh_token = create_refresh_token(data={"sub": user["username"]})
+    log_auth_event("LOGIN", user["username"], True)
     return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
 
 @app.post("/refresh", response_model=Token)
@@ -110,8 +116,14 @@ async def refresh_token(token_data: TokenRefresh):
 
 @app.post("/logout")
 async def logout(token: str = Depends(oauth2_scheme)):
-    add_to_blacklist(token)
-    return {"message": "Successfully logged out"}
+    try:
+        token_data = verify_token(token)
+        add_to_blacklist(token)
+        log_auth_event("LOGOUT", token_data.username, True)
+        return {"message": "Successfully logged out"}
+    except JWTError:
+        log_security_event("Logout attempt", "Invalid token")
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 @app.get("/users/me", response_model=UserResponse)
 async def read_users_me(current_user: dict = Depends(get_current_user)):
@@ -124,6 +136,7 @@ async def add_process_time_header(request: Request, call_next):
     response = await call_next(request)
     process_time = time.time() - start_time
     response.headers["X-Process-Time"] = str(process_time)
+    log_request(request.method, request.url.path, response.status_code, process_time)
     return response
 
 @app.get("/")

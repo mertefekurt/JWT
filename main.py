@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from datetime import timedelta
+from datetime import timedelta, datetime
 from jose import JWTError, jwt
 from config import settings
 from models import UserCreate, UserLogin, UserResponse, Token, TokenRefresh
@@ -138,6 +138,28 @@ async def add_process_time_header(request: Request, call_next):
     response.headers["X-Process-Time"] = str(process_time)
     log_request(request.method, request.url.path, response.status_code, process_time)
     return response
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "JWT Learning API",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/status")
+async def status_check():
+    from repository import user_repository
+    from token_blacklist import blacklisted_tokens
+    total_users = len(user_repository.get_all())
+    blacklisted_count = len(blacklisted_tokens)
+    return {
+        "status": "operational",
+        "users_count": total_users,
+        "blacklisted_tokens": blacklisted_count,
+        "token_expiry_minutes": settings.access_token_expire_minutes,
+        "refresh_token_expiry_days": settings.refresh_token_expire_days
+    }
 
 @app.get("/")
 async def root():

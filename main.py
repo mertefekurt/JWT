@@ -10,6 +10,7 @@ from models import UserCreate, UserLogin, UserResponse, Token, TokenRefresh
 from jwt_handler import verify_password, get_password_hash, create_access_token, create_refresh_token, verify_token
 from token_blacklist import add_to_blacklist
 from exceptions import token_exception_handler, jwt_exception_handler, validation_exception_handler, TokenException
+from repository import user_repository
 
 app = FastAPI(title="JWT Learning Project")
 
@@ -32,24 +33,14 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-fake_users_db = {
-    "testuser": {
-        "id": 1,
-        "username": "testuser",
-        "email": "test@example.com",
-        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",
-        "created_at": "2024-01-01T00:00:00"
-    }
-}
-
-def get_user(username: str):
-    if username in fake_users_db:
-        user_dict = fake_users_db[username]
-        return user_dict
-    return None
+user_repository.create({
+    "username": "testuser",
+    "email": "test@example.com",
+    "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW"
+})
 
 def authenticate_user(username: str, password: str):
-    user = get_user(username)
+    user = user_repository.get_by_username(username)
     if not user:
         return False
     if not verify_password(password, user["hashed_password"]):
@@ -66,28 +57,23 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         token_data = verify_token(token)
     except JWTError:
         raise credentials_exception
-    user = get_user(username=token_data.username)
+    user = user_repository.get_by_username(token_data.username)
     if user is None:
         raise credentials_exception
     return user
 
 @app.post("/register", response_model=UserResponse)
 async def register(user: UserCreate):
-    if user.username in fake_users_db:
+    if user_repository.exists(user.username):
         raise HTTPException(status_code=400, detail="Username already registered")
-    for existing_user in fake_users_db.values():
-        if existing_user["email"] == user.email:
-            raise HTTPException(status_code=400, detail="Email already registered")
+    if user_repository.get_by_email(user.email):
+        raise HTTPException(status_code=400, detail="Email already registered")
     hashed_password = get_password_hash(user.password)
-    from datetime import datetime
-    new_user = {
-        "id": len(fake_users_db) + 1,
+    new_user = user_repository.create({
         "username": user.username,
         "email": user.email,
-        "hashed_password": hashed_password,
-        "created_at": datetime.now().isoformat()
-    }
-    fake_users_db[user.username] = new_user
+        "hashed_password": hashed_password
+    })
     return UserResponse(**new_user)
 
 @app.post("/login", response_model=Token)

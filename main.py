@@ -7,7 +7,7 @@ from datetime import timedelta, datetime
 from jose import JWTError, jwt
 from config import settings
 from models import UserCreate, UserLogin, UserResponse, Token, TokenRefresh, UserUpdate, PasswordChange
-from jwt_handler import verify_password, get_password_hash, create_access_token, create_refresh_token, verify_token
+from jwt_handler import verify_password, get_password_hash, create_access_token, create_refresh_token, verify_token, verify_refresh_token
 from token_blacklist import add_to_blacklist
 from exceptions import token_exception_handler, jwt_exception_handler, validation_exception_handler, TokenException
 from repository import user_repository
@@ -101,15 +101,13 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 @app.post("/refresh", response_model=Token)
 async def refresh_token(token_data: TokenRefresh):
     try:
-        token_info = verify_token(token_data.refresh_token)
-        payload = jwt.decode(token_data.refresh_token, settings.secret_key, algorithms=[settings.algorithm])
-        if payload.get("type") != "refresh":
-            raise HTTPException(status_code=401, detail="Invalid token type")
+        token_info = verify_refresh_token(token_data.refresh_token)
         access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
         new_access_token = create_access_token(
             data={"sub": token_info.username}, expires_delta=access_token_expires
         )
         new_refresh_token = create_refresh_token(data={"sub": token_info.username})
+        add_to_blacklist(token_data.refresh_token)
         return {"access_token": new_access_token, "refresh_token": new_refresh_token, "token_type": "bearer"}
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid refresh token")

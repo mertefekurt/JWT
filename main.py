@@ -17,7 +17,7 @@ app = FastAPI(title="JWT Learning Project")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,7 +25,7 @@ app.add_middleware(
 
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["*"]
+    allowed_hosts=settings.trusted_hosts
 )
 
 app.add_exception_handler(TokenException, token_exception_handler)

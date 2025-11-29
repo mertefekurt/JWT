@@ -23,7 +23,7 @@ class UserRepository:
     def create(self, user_data: dict) -> dict:
         user_id = len(self._users) + 1
         user_data["id"] = user_id
-        user_data["created_at"] = datetime.now().isoformat()
+        user_data["created_at"] = datetime.now()
         self._users[user_data["username"]] = user_data
         return user_data
     

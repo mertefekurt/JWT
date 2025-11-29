@@ -30,14 +30,14 @@ def create_refresh_token(data: dict) -> str:
     encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
     return encoded_jwt
 
-def verify_token(token: str) -> TokenData:
+def verify_token(token: str, token_type: str = "access") -> TokenData:
     if is_token_blacklisted(token):
         raise JWTError("Token has been revoked")
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        token_type = payload.get("type")
-        if token_type and token_type != "access":
-            raise JWTError("Invalid token type for this endpoint")
+        payload_token_type = payload.get("type")
+        if payload_token_type and payload_token_type != token_type:
+            raise JWTError(f"Invalid token type. Expected {token_type}, got {payload_token_type}")
         username: str = payload.get("sub")
         if username is None:
             raise JWTError("Token invalid")
@@ -45,4 +45,7 @@ def verify_token(token: str) -> TokenData:
         return token_data
     except JWTError:
         raise JWTError("Token invalid")
+
+def verify_refresh_token(token: str) -> TokenData:
+    return verify_token(token, token_type="refresh")
 

@@ -187,10 +187,13 @@ async def add_process_time_header(request: Request, call_next):
 
 @app.get("/health")
 async def health_check():
+    from token_blacklist import remove_expired_tokens
+    cleaned_tokens = remove_expired_tokens()
     return {
         "status": "healthy",
         "service": "JWT Learning API",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "cleaned_expired_tokens": cleaned_tokens
     }
 
 @app.get("/status")

@@ -46,6 +46,12 @@ class UserRepository:
     
     def exists(self, username: str) -> bool:
         return username in self._users
+    
+    def delete(self, username: str) -> bool:
+        if username not in self._users:
+            return False
+        del self._users[username]
+        return True
 
 user_repository = UserRepository()
 

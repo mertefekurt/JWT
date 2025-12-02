@@ -30,6 +30,7 @@ class UserRepository:
     def update(self, username: str, update_data: dict) -> Optional[dict]:
         if username not in self._users:
             return None
+        update_data["updated_at"] = datetime.now()
         self._users[username].update(update_data)
         return self._users[username]
     

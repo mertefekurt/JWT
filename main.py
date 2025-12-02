@@ -34,11 +34,12 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-user_repository.create({
-    "username": "testuser",
-    "email": "test@example.com",
-    "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW"
-})
+if settings.environment == "development":
+    user_repository.create({
+        "username": "testuser",
+        "email": "test@example.com",
+        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW"
+    })
 
 def authenticate_user(username: str, password: str):
     user = user_repository.get_by_username(username)

@@ -13,7 +13,7 @@ from exceptions import token_exception_handler, jwt_exception_handler, validatio
 from repository import user_repository
 from logger import log_request, log_error, log_auth_event, log_security_event
 
-app = FastAPI(title="JWT Learning Project")
+app = FastAPI(title=settings.app_name)
 
 app.add_middleware(
     CORSMiddleware,
@@ -175,6 +175,19 @@ async def change_password(
     log_auth_event("PASSWORD_CHANGE", current_user["username"], True)
     return {"message": "Password changed successfully"}
 
+
+@app.delete("/users/me")
+async def delete_current_user(
+    current_user: dict = Depends(get_current_user),
+    token: str = Depends(oauth2_scheme),
+):
+    deleted = user_repository.delete(current_user["username"])
+    if not deleted:
+        raise HTTPException(status_code=404, detail="User not found")
+    add_to_blacklist(token)
+    log_auth_event("DELETE_ACCOUNT", current_user["username"], True)
+    return {"message": "User deleted successfully"}
+
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     import time
@@ -207,10 +220,20 @@ async def status_check():
         "users_count": total_users,
         "blacklisted_tokens": blacklisted_count,
         "token_expiry_minutes": settings.access_token_expire_minutes,
-        "refresh_token_expiry_days": settings.refresh_token_expire_days
+        "refresh_token_expire_days": settings.refresh_token_expire_days,
+        "app_version": settings.app_version,
     }
+
+
+@app.get("/version")
+async def version():
+    return {
+        "app_name": settings.app_name,
+        "version": settings.app_version,
+    }
+
 
 @app.get("/")
 async def root():
-    return {"message": "JWT Learning API", "docs": "/docs"}
+    return {"message": settings.app_name, "docs": "/docs"}
 

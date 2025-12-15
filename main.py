@@ -258,6 +258,29 @@ async def version():
     }
 
 
+@app.get("/metrics")
+async def metrics():
+    from repository import user_repository
+    from token_blacklist import blacklisted_tokens
+    users = user_repository.get_all()
+    total_logins = sum(user.get("login_count", 0) for user in users)
+    return {
+        "users_count": len(users),
+        "total_logins": total_logins,
+        "blacklisted_tokens": len(blacklisted_tokens),
+    }
+
+
+@app.get("/support")
+async def support():
+    return {
+        "email": settings.support_email,
+        "service": settings.app_name,
+        "version": settings.app_version,
+        "environment": settings.environment,
+    }
+
+
 @app.get("/")
 async def root():
     return {"message": settings.app_name, "docs": "/docs"}

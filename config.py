@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     app_name: str = "JWT Learning API"
     app_version: str = "1.0.0"
     environment: str = "development"
+    support_email: str = "support@example.com"
 
     class Config:
         env_file = ".env"

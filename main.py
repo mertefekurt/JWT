@@ -3,7 +3,8 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
+import uuid
 from jose import JWTError, jwt
 from config import settings
 from models import UserCreate, UserLogin, UserResponse, Token, TokenRefresh, UserUpdate, PasswordChange
@@ -14,6 +15,7 @@ from repository import user_repository
 from logger import log_request, log_error, log_auth_event, log_security_event
 
 app = FastAPI(title=settings.app_name)
+app_start_time = datetime.now(timezone.utc)
 
 app.add_middleware(
     CORSMiddleware,
@@ -96,6 +98,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         data={"sub": user["username"]}, expires_delta=access_token_expires
     )
     refresh_token = create_refresh_token(data={"sub": user["username"]})
+    user_repository.record_login(user["username"])
     log_auth_event("LOGIN", user["username"], True)
     return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
 
@@ -177,6 +180,21 @@ async def change_password(
     return {"message": "Password changed successfully"}
 
 
+@app.get("/users/me/activity")
+async def user_activity(current_user: dict = Depends(get_current_user)):
+    username = current_user["username"]
+    user = user_repository.get_by_username(username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {
+        "username": username,
+        "created_at": user.get("created_at"),
+        "updated_at": user.get("updated_at"),
+        "last_login": user.get("last_login"),
+        "login_count": user.get("login_count", 0),
+    }
+
+
 @app.delete("/users/me")
 async def delete_current_user(
     current_user: dict = Depends(get_current_user),
@@ -192,11 +210,14 @@ async def delete_current_user(
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     import time
+    request_id = str(uuid.uuid4())
+    request.state.request_id = request_id
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
     response.headers["X-Process-Time"] = str(process_time)
-    log_request(request.method, request.url.path, response.status_code, process_time)
+    response.headers["X-Request-ID"] = request_id
+    log_request(request.method, request.url.path, response.status_code, process_time, request_id)
     return response
 
 @app.get("/health")
@@ -223,6 +244,9 @@ async def status_check():
         "token_expiry_minutes": settings.access_token_expire_minutes,
         "refresh_token_expire_days": settings.refresh_token_expire_days,
         "app_version": settings.app_version,
+        "environment": settings.environment,
+        "log_level": settings.log_level,
+        "uptime_seconds": (datetime.now(timezone.utc) - app_start_time).total_seconds(),
     }
 
 

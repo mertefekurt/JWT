@@ -24,8 +24,9 @@ logging.basicConfig(
 logger = logging.getLogger("jwt_api")
 
 
-def log_request(method: str, path: str, status_code: int, process_time: float):
-    logger.info(f"{method} {path} - Status: {status_code} - Time: {process_time:.4f}s")
+def log_request(method: str, path: str, status_code: int, process_time: float, request_id: str = None):
+    rid_part = f" - ReqID: {request_id}" if request_id else ""
+    logger.info(f"{method} {path} - Status: {status_code} - Time: {process_time:.4f}s{rid_part}")
 
 
 def log_error(message: str, error: Exception = None):

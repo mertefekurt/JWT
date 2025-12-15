@@ -1,5 +1,5 @@
 from typing import Optional, Dict, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 class UserRepository:
     def __init__(self):
@@ -23,16 +23,27 @@ class UserRepository:
     def create(self, user_data: dict) -> dict:
         user_id = len(self._users) + 1
         user_data["id"] = user_id
-        user_data["created_at"] = datetime.now()
+        user_data["created_at"] = datetime.now(timezone.utc)
+        user_data.setdefault("login_count", 0)
+        user_data.setdefault("last_login", None)
         self._users[user_data["username"]] = user_data
         return user_data
     
     def update(self, username: str, update_data: dict) -> Optional[dict]:
         if username not in self._users:
             return None
-        update_data["updated_at"] = datetime.now()
+        update_data["updated_at"] = datetime.now(timezone.utc)
         self._users[username].update(update_data)
         return self._users[username]
+
+    def record_login(self, username: str) -> Optional[dict]:
+        if username not in self._users:
+            return None
+        user = self._users[username]
+        user["last_login"] = datetime.now(timezone.utc)
+        user["login_count"] = user.get("login_count", 0) + 1
+        user["updated_at"] = user["last_login"]
+        return user
     
     def update_username(self, old_username: str, new_username: str) -> bool:
         if old_username not in self._users or new_username in self._users:

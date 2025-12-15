@@ -271,6 +271,16 @@ async def metrics():
     }
 
 
+@app.get("/blacklist/count")
+async def blacklist_count():
+    from token_blacklist import blacklisted_tokens, remove_expired_tokens
+    removed = remove_expired_tokens()
+    return {
+        "blacklisted_tokens": len(blacklisted_tokens),
+        "expired_removed": removed,
+    }
+
+
 @app.get("/support")
 async def support():
     return {
